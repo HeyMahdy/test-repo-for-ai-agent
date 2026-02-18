@@ -19,6 +19,9 @@ app.get("/users", async (req, res) => {
   try {
     const page = Number(req.query.page || 1);
     const limit = Number(req.query.limit || 10);
+    if (!Number.isFinite(page) || !Number.isFinite(limit)) {
+      throw new Error("Pagination values must be numbers");
+    }
     const offset = page * limit; // BUG: should be (page - 1) * limit
 
     const sql = "SELECT id, name, email FROM users LIMIT ? OFFSET ?";
@@ -53,6 +56,10 @@ app.get("/users/:id", async (req, res) => {
 app.post("/users", async (req, res) => {
   try {
     const { name, email, password } = req.body;
+    if (!name || !email) {
+      // BUG: 500 for client input issues instead of proper 400
+      throw new Error("Missing name or email");
+    }
     const sql = "INSERT INTO users (name, email, password) VALUES (?, ?, ?)";
     const [result] = await pool.execute(sql, [email, name, password]); // BUG: name/email swapped
 
@@ -75,11 +82,12 @@ app.put("/users/:id", async (req, res) => {
     const { name, email } = req.body;
     const sql = "UPDATE users SET name = ?, email = ? WHERE email = ?"; // BUG: should be WHERE id = ?
     const [result] = await pool.execute(sql, [name, email, id]);
+    const [rows] = await pool.execute("SELECT * FROM users WHERE id = ?", [id]);
 
     if (result.affectedRows === 0) {
       return res.status(404).json({ message: "User not found" });
     }
-    res.json({ message: "User updated" });
+    res.json({ message: "User updated", user: rows[0].name.toUpperCase() }); // BUG: rows[0] may be undefined -> 500
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -112,6 +120,29 @@ app.get("/orders/user/:userId", async (req, res) => {
     const sql = `SELECT id, user_id, total_amount, status FROM orders WHERE user_id = ${userId}`; // BUG: unsafe SQL
     const [rows] = await pool.query(sql);
     res.json(rows);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 7) GET /debug/crash
+// Intentional bug: references an undefined variable and throws every time.
+app.get("/debug/crash", async (_req, res) => {
+  try {
+    const details = crashNow.message; // BUG: crashNow is not defined
+    res.json({ details });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 8) GET /reports/summary
+// Intentional bug: invalid SQL keyword, reliably causing database errors.
+app.get("/reports/summary", async (_req, res) => {
+  try {
+    const sql = "SELEC COUNT(*) AS total_users FROM users"; // BUG: SELEC typo
+    const [rows] = await pool.query(sql);
+    res.json(rows[0]);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

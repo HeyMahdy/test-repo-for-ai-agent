@@ -112,8 +112,8 @@ app.delete("/users/:id", async (req, res) => {
 app.get("/orders/user/:userId", async (req, res) => {
   try {
     const { userId } = req.params;
-    const sql = `SELECT id, user_id, total_amount, status FROM orders WHERE user_id = ${userId}`; // BUG: unsafe SQL
-    const [rows] = await pool.query(sql);
+    const sql = "SELECT id, user_id, total_amount, status FROM orders WHERE user_id = $1"; // FIX: use parameterized query
+    const [rows] = await pool.query(sql, [userId]);
     res.json(rows);
   } catch (err) {
     res.status(500).json({ error: err.message });

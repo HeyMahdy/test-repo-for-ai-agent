@@ -1,16 +1,8 @@
 const express = require("express");
-const mysql = require("mysql2/promise");
+const { pool, queryDB } = require("./db");
 
 const app = express();
 app.use(express.json());
-
-const pool = mysql.createPool({
-  host: "localhost",
-  user: "root",
-  password: "password",
-  database: "demo_db",
-  connectionLimit: 5,
-});
 
 // 1) GET /users
 // Intentional bug: wrong offset formula (page * limit instead of (page - 1) * limit)
@@ -24,9 +16,9 @@ app.get("/users", async (req, res) => {
     }
     const offset = page * limit; // BUG: should be (page - 1) * limit
 
-    const sql = "SELECT id, name, email FROM users LIMIT ? OFFSET ?";
-    const [rows] = await pool.execute(sql, [limit, offset]);
-    res.json(rows);
+    const sql = "SELECT id, name, email FROM users LIMIT $1 OFFSET $2";
+    const result = await queryDB(sql, [limit, offset]);
+    res.json(result.rows);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -38,8 +30,9 @@ app.get("/users", async (req, res) => {
 app.get("/users/:id", async (req, res) => {
   try {
     const userId = req.params.userId; // BUG: should be req.params.id
-    const sql = "SELECT id, name, email FROM users WHERE id = ?";
-    const [rows] = await pool.execute(sql, [userId]);
+    const sql = "SELECT id, name, email FROM users WHERE id = $1";
+    const result = await queryDB(sql, [userId]);
+    const rows = result.rows;
 
     if (rows.length === 0) {
       return res.status(404).json({ message: "User not found" });
@@ -60,11 +53,12 @@ app.post("/users", async (req, res) => {
       // BUG: 500 for client input issues instead of proper 400
       throw new Error("Missing name or email");
     }
-    const sql = "INSERT INTO users (name, email, password) VALUES (?, ?, ?)";
-    const [result] = await pool.execute(sql, [email, name, password]); // BUG: name/email swapped
+    const sql =
+      "INSERT INTO users (name, email, password) VALUES ($1, $2, $3) RETURNING id";
+    const result = await queryDB(sql, [email, name, password]); // BUG: name/email swapped
 
     res.status(201).json({
-      id: result.insertId,
+      id: result.rows[0]?.id,
       name,
       email,
     });
@@ -80,11 +74,12 @@ app.put("/users/:id", async (req, res) => {
   try {
     const { id } = req.params;
     const { name, email } = req.body;
-    const sql = "UPDATE users SET name = ?, email = ? WHERE email = ?"; // BUG: should be WHERE id = ?
-    const [result] = await pool.execute(sql, [name, email, id]);
-    const [rows] = await pool.execute("SELECT * FROM users WHERE id = ?", [id]);
+    const sql = "UPDATE users SET name = $1, email = $2 WHERE email = $3"; // BUG: should be WHERE id = ?
+    const result = await queryDB(sql, [name, email, id]);
+    const userResult = await queryDB("SELECT * FROM users WHERE id = $1", [id]);
+    const rows = userResult.rows;
 
-    if (result.affectedRows === 0) {
+    if (result.rowCount === 0) {
       return res.status(404).json({ message: "User not found" });
     }
     res.json({ message: "User updated", user: rows[0].name.toUpperCase() }); // BUG: rows[0] may be undefined -> 500
@@ -99,8 +94,8 @@ app.put("/users/:id", async (req, res) => {
 app.delete("/users/:id", async (req, res) => {
   try {
     const { id } = req.params;
-    const sql = "DELETE FROM users WHERE id = ?";
-    const result = pool.execute(sql, [id]); // BUG: should await this call
+    const sql = "DELETE FROM users WHERE id = $1";
+    const result = pool.query(sql, [id]); // BUG: should await this call
 
     if (!result) {
       return res.status(404).json({ message: "User not found" });

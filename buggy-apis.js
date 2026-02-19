@@ -135,7 +135,7 @@ app.get("/debug/crash", async (_req, res) => {
 // Intentional bug: invalid SQL keyword, reliably causing database errors.
 app.get("/reports/summary", async (_req, res) => {
   try {
-    const sql = "SELEC COUNT(*) AS total_users FROM users"; // BUG: SELEC typo
+    const sql = "SELECT COUNT(*) AS total_users FROM users"; // Fixed typo from SELEC to SELECT
     const [rows] = await pool.query(sql);
     res.json(rows[0]);
   } catch (err) {

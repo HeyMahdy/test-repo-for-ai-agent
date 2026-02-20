@@ -78,7 +78,7 @@ app.put("/users/:id", async (req, res) => {
     }
     const result = await queryDB(
       `UPDATE users
-       SET email = , password = $2, updated_at = now()
+       SET email = $1, password = $2, updated_at = now()
        WHERE id = $3
        RETURNING id, email, created_at, updated_at`,
       [email, password, id]

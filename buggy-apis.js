@@ -29,7 +29,7 @@ app.get("/users", async (req, res) => {
 // API symptom: commonly 404 { message: "User not found" } because userId becomes undefined.
 app.get("/users/:id", async (req, res) => {
   try {
-    const userId = req.params.userId; // BUG: should be req.params.id
+    const userId = req.params.id; // Fixed: corrected to req.params.id
     const sql = "SELECT id, name, email FROM users WHERE id = $1";
     const result = await queryDB(sql, [userId]);
     const rows = result.rows;

@@ -178,6 +178,12 @@ describe("Users table APIs", () => {
     });
   });
 
+  test("GET /users/:id returns 400 for invalid uuid", async () => {
+    const res = await request(app).get("/users/5");
+    expect(res.statusCode).toBe(400);
+    expect(res.body).toEqual({ error: "Invalid user id" });
+  });
+
   test("POST /users creates a user", async () => {
     const userData = { email: "john@example.com", password: "pass" };
     const res = await request(app).post("/users").send(userData);

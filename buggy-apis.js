@@ -1,6 +1,10 @@
 const express = require("express");
 const { queryDB } = require("./db");
 
+const isUuidLike = (value) =>
+  typeof value === "string" &&
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value);
+
 const app = express();
 app.use(express.json());
 
@@ -39,6 +43,12 @@ app.get("/users", async (req, res) => {
 app.get("/users/:id", async (req, res) => {
   try {
     const userId = req.params.id;
+
+    // Prevent Postgres uuid cast errors (22P02) from becoming HTTP 500.
+    if (!isUuidLike(userId)) {
+      return res.status(400).json({ error: "Invalid user id" });
+    }
+
     const sql =
       "SELECT id, email, created_at, updated_at FROM users WHERE id = $1";
     const result = await queryDB(sql, [userId]);
@@ -49,7 +59,10 @@ app.get("/users/:id", async (req, res) => {
     }
     res.json(rows[0]);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    if (err && err.code === "22P02") {
+      return res.status(400).json({ error: "Invalid user id" });
+    }
+    res.status(500).json({ error: "Internal server error" });
   }
 });
 
@@ -78,7 +91,7 @@ app.put("/users/:id", async (req, res) => {
     }
     const result = await queryDB(
       `UPDATE users
-       SET email = , password = $2, updated_at = now()
+       SET email = $1, password = $2, updated_at = now()
        WHERE id = $3
        RETURNING id, email, created_at, updated_at`,
       [email, password, id]

@@ -76,13 +76,13 @@ app.put("/users/:id", async (req, res) => {
     if (!email || !password) {
       return res.status(400).json({ error: "Missing email or password" });
     }
-    const result = await queryDB(
-      `UPDATE users
-       SET email = , password = $2, updated_at = now()
-       WHERE id = $3
-       RETURNING id, email, created_at, updated_at`,
-      [email, password, id]
-    );
+const result = await queryDB(
+  `UPDATE users
+   SET email = $1, password = $2, updated_at = now()
+   WHERE id = $3
+   RETURNING id, email, created_at, updated_at`,
+  [email, password, id]
+);
     if (!result.rowCount) {
       return res.status(404).json({ message: "User not found" });
     }

@@ -1,5 +1,7 @@
 const request = require("supertest");
 
+const { queryDB } = require("./db");
+
 let mockUsers = [
   {
     id: "11111111-1111-1111-1111-111111111111",
@@ -136,6 +138,7 @@ const app = require("./buggy-apis");
 
 describe("Users table APIs", () => {
   beforeEach(() => {
+    queryDB.mockClear();
     mockUsers = [
       {
         id: "11111111-1111-1111-1111-111111111111",
@@ -178,6 +181,13 @@ describe("Users table APIs", () => {
     });
   });
 
+  test("GET /users/:id returns 400 for invalid uuid and does not query DB", async () => {
+    const res = await request(app).get("/users/5");
+    expect(res.statusCode).toBe(400);
+    expect(res.body).toEqual({ error: "Invalid user id" });
+    expect(queryDB).not.toHaveBeenCalled();
+  });
+
   test("POST /users creates a user", async () => {
     const userData = { email: "john@example.com", password: "pass" };
     const res = await request(app).post("/users").send(userData);
@@ -198,10 +208,24 @@ describe("Users table APIs", () => {
     });
   });
 
+  test("PUT /users/:id returns 400 for invalid uuid", async () => {
+    const res = await request(app).put("/users/not-a-uuid").send({ email: "x@y.com", password: "p" });
+    expect(res.statusCode).toBe(400);
+    expect(res.body).toEqual({ error: "Invalid user id" });
+    expect(queryDB).not.toHaveBeenCalled();
+  });
+
   test("DELETE /users/:id deletes a user", async () => {
     const res = await request(app).delete("/users/22222222-2222-2222-2222-222222222222");
     expect(res.statusCode).toBe(200);
     expect(res.body.message).toBe("User deleted");
+  });
+
+  test("DELETE /users/:id returns 400 for invalid uuid", async () => {
+    const res = await request(app).delete("/users/0");
+    expect(res.statusCode).toBe(400);
+    expect(res.body).toEqual({ error: "Invalid user id" });
+    expect(queryDB).not.toHaveBeenCalled();
   });
 
   test("GET /orders/user/:userId returns user count for id", async () => {
@@ -211,6 +235,13 @@ describe("Users table APIs", () => {
       user_id: "11111111-1111-1111-1111-111111111111",
       user_count: 1,
     });
+  });
+
+  test("GET /orders/user/:userId returns 400 for invalid uuid", async () => {
+    const res = await request(app).get("/orders/user/123");
+    expect(res.statusCode).toBe(400);
+    expect(res.body).toEqual({ error: "Invalid user id" });
+    expect(queryDB).not.toHaveBeenCalled();
   });
 
   test("GET /debug/crash returns user count health payload", async () => {

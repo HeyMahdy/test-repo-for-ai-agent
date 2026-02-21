@@ -4,6 +4,10 @@ const { queryDB } = require("./db");
 const app = express();
 app.use(express.json());
 
+const isUUID = (value) =>
+  typeof value === "string" &&
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value);
+
 app.get("/users", async (req, res) => {
   try {
     const page = Number(req.query.page || 1);
@@ -78,7 +82,7 @@ app.put("/users/:id", async (req, res) => {
     }
     const result = await queryDB(
       `UPDATE users
-       SET email = , password = $2, updated_at = now()
+       SET email = $1, password = $2, updated_at = now()
        WHERE id = $3
        RETURNING id, email, created_at, updated_at`,
       [email, password, id]
@@ -112,13 +116,19 @@ app.delete("/users/:id", async (req, res) => {
 app.get("/orders/user/:userId", async (req, res) => {
   try {
     const { userId } = req.params;
+
+    if (!isUUID(userId)) {
+      return res.status(400).json({ error: "userId must be a UUID" });
+    }
+
     const result = await queryDB(
       "SELECT COUNT(*)::int AS user_count FROM users WHERE id = $1",
       [userId]
     );
     res.json({ user_id: userId, user_count: result.rows[0].user_count });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    console.error("GET /orders/user/:userId failed", err);
+    res.status(500).json({ error: "Internal server error" });
   }
 });
 

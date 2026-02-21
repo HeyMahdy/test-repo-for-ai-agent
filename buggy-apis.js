@@ -36,7 +36,7 @@ app.get("/users", async (req, res) => {
   }
 });
 
-app.get("/users/:id", async (req, res) => {
+async function getUserById(req, res) {
   try {
     const userId = req.params.id;
     const sql =
@@ -51,7 +51,13 @@ app.get("/users/:id", async (req, res) => {
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
-});
+}
+
+app.get("/users/:id", getUserById);
+
+// Backwards-compatible alias for clients that call the singular route.
+// Keeps behavior and DB/query logic identical to GET /users/:id.
+app.get("/user/:id", getUserById);
 
 app.post("/users", async (req, res) => {
   try {
@@ -78,7 +84,7 @@ app.put("/users/:id", async (req, res) => {
     }
     const result = await queryDB(
       `UPDATE users
-       SET email = , password = $2, updated_at = now()
+       SET email = $1, password = $2, updated_at = now()
        WHERE id = $3
        RETURNING id, email, created_at, updated_at`,
       [email, password, id]

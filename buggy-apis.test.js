@@ -178,6 +178,15 @@ describe("Users table APIs", () => {
     });
   });
 
+  test("GET /user/:id (singular alias) returns a user", async () => {
+    const res = await request(app).get("/user/11111111-1111-1111-1111-111111111111");
+    expect(res.statusCode).toBe(200);
+    expect(res.body).toMatchObject({
+      id: "11111111-1111-1111-1111-111111111111",
+      email: "alice@example.com",
+    });
+  });
+
   test("POST /users creates a user", async () => {
     const userData = { email: "john@example.com", password: "pass" };
     const res = await request(app).post("/users").send(userData);

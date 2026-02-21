@@ -213,6 +213,12 @@ describe("Users table APIs", () => {
     });
   });
 
+  test("GET /orders/user/:userId returns 400 for invalid uuid", async () => {
+    const res = await request(app).get("/orders/user/5");
+    expect(res.statusCode).toBe(400);
+    expect(res.body).toEqual({ error: "userId must be a UUID" });
+  });
+
   test("GET /debug/crash returns user count health payload", async () => {
     const res = await request(app).get("/debug/crash");
     expect(res.statusCode).toBe(200);
